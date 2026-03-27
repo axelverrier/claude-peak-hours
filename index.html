@@ -214,7 +214,7 @@
 
   <div class="header">
     <h1>Claude Code Peak/Off peak</h1>
-    <p>Claude recently announced on <a href="https://x.com/status/20372546070015559305" target="_blank" rel="noopener">X</a> that they would increase tokens burning rates peak hours (5 AM – 11 AM Pacific Time).</p>
+    <p>Claude recently announced on <a href="https://x.com/status/20372546070015559305" target="_blank" rel="noopener">X</a> that they would increase tokens burning rates during peak hours (5 AM – 11 AM Pacific Time) on weekdays.</p>
   </div>
 
   <div class="status-badge" id="status-badge">
@@ -251,8 +251,8 @@
   <div class="clock" id="clock"></div>
 
   <div class="info">
-    Peak hours are defined as <strong>5:00 AM – 11:00 AM Pacific Time</strong> (America/Los_Angeles).<br>
-    The highlighted region shows when those hours fall in your selected timezone.<br>
+    Peak hours are <strong>weekdays, 5:00 AM – 11:00 AM Pacific Time</strong> (America/Los_Angeles).<br>
+    Weekends are always off-peak. The highlighted region shows when peak hours fall in your timezone.<br>
     The white line shows your current local time.
   </div>
 
@@ -398,6 +398,15 @@ function tickLabel(h) {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
+/** Returns true if it is currently a weekday (Mon–Fri) in Pacific Time */
+function isWeekdayInPT() {
+  const day = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'short'
+  }).format(new Date());
+  return !['Sat', 'Sun'].includes(day);
+}
+
 /** Return peak segments in local time as [{start, end}] (values in 0–24) */
 function getPeakSegments(offsetHours) {
   // Convert PT peak window to local time
@@ -435,10 +444,11 @@ function isHourPeak(h, segments) {
 function pct(h) { return (h / 24 * 100).toFixed(4) + '%'; }
 
 function render(timezone) {
-  const offset   = getOffsetFromPT(timezone);
-  const segments = getPeakSegments(offset);
-  const nowH     = getCurrentHourDecimal(timezone);
-  const peak     = isHourPeak(nowH, segments);
+  const offset    = getOffsetFromPT(timezone);
+  const weekday   = isWeekdayInPT();
+  const segments  = weekday ? getPeakSegments(offset) : [];
+  const nowH      = getCurrentHourDecimal(timezone);
+  const peak      = weekday && isHourPeak(nowH, segments);
 
   // Status badge
   const badge = document.getElementById('status-badge');
@@ -452,8 +462,9 @@ function render(timezone) {
   const startStr = formatHour(pStart);
   const endStr   = formatHour(pEnd);
   const nextDayNote = ((pEnd % 24 + 24) % 24) < ((pStart % 24 + 24) % 24) ? ' <span style="color:#555">(next day)</span>' : '';
-  document.getElementById('window-label').innerHTML =
-    `Peak in your timezone: <strong>${startStr} – ${endStr}</strong>${nextDayNote}`;
+  document.getElementById('window-label').innerHTML = weekday
+    ? `Peak in your timezone: <strong>${startStr} – ${endStr}</strong>${nextDayNote}`
+    : `<span style="color:#00d46a">Weekend in PT — off-peak all day</span>`;
 
   // Timeline bar
   const track = document.getElementById('bar-track');
@@ -465,7 +476,7 @@ function render(timezone) {
   bg.style.left = '0'; bg.style.width = '100%';
   track.appendChild(bg);
 
-  // Peak overlays
+  // Peak overlays (only on weekdays)
   segments.forEach(seg => {
     const el = document.createElement('div');
     el.className = 'segment peak';
